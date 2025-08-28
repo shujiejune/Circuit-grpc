@@ -1,0 +1,62 @@
+// Define the protocol buffer version
+syntax = "proto3";
+
+// Specify the package to prevent name clashes
+package user;
+
+// Specify the Go package path for the generated code
+option go_package = "dispatch-and-delivery/pkg/proto/user";
+
+// Import necessary well-known types
+import "google/protobuf/timestamp.proto";
+
+// The UserService defines all the RPCs (Remote Procedure Calls) for managing
+// users.
+service UserService {
+  // Registers a new user
+  rpc RegisterUser(RegisterUserRequest) returns (RegisterUserResponse);
+  // Authenticates a user and returns a JWT
+  rpc LoginUser(LoginUserRequest) returns (LoginUserResponse);
+  // Retrieves a user's profile information
+  rpc GetUserProfile(GetUserProfileRequest) returns (GetUserProfileResponse);
+}
+
+// --- RegisterUser RPC Messages ---
+
+message RegisterUserRequest {
+  string name = 1;
+  string email = 2;
+  string password = 3;
+}
+
+message RegisterUserResponse {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+// --- LoginUser RPC Messages ---
+
+message LoginUserRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message LoginUserResponse {
+  string access_token = 1; // The JWT
+}
+
+// --- GetUserProfile RPC Messages ---
+
+message GetUserProfileRequest {
+  string user_id = 1; // The ID of the user to fetch
+}
+
+message GetUserProfileResponse {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+}
