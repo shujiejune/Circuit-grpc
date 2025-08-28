@@ -3,7 +3,6 @@ package users
 import (
 	"context"
 
-	// Import the generated protobuf package
 	pb "dispatch-and-delivery/pkg/proto/user"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
