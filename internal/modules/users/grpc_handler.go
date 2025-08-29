@@ -2,9 +2,13 @@ package users
 
 import (
 	"context"
-
+	"dispatch-and-delivery/internal/models"
 	pb "dispatch-and-delivery/pkg/proto/user"
+	"dispatch-and-delivery/pkg/utils"
+	"errors"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -25,46 +29,59 @@ func NewGRPCHandler(s ServiceInterface) *GRPCHandler {
 
 // RegisterUser handles the gRPC request for creating a new user.
 func (h *GRPCHandler) RegisterUser(ctx context.Context, req *pb.RegisterUserRequest) (*pb.RegisterUserResponse, error) {
-	// Here we would typically convert the gRPC request to a struct that our service understands,
-	// but for simplicity, we can pass the primitive values directly.
-	createdUser, err := h.service.Signup(ctx, req.Name, req.Email, req.Password)
+	// In gRPC, validation should happen here or in the service layer.
+	authRes, err := h.service.Signup(ctx, models.SignupRequest{Nickname: req.Name, Email: req.Email, Password: req.Password})
 	if err != nil {
-		// gRPC has its own error model. We should return gRPC status codes.
-		// For now, we return the plain error, but this would be enhanced.
-		return nil, err
+		// Translate domain errors to gRPC status codes
+		if errors.Is(err, models.ErrConflict) {
+			return nil, status.Error(codes.AlreadyExists, "email address is already in use")
+		}
+		return nil, status.Error(codes.Internal, "failed to create user")
 	}
-
-	// Convert the service layer's response model to the gRPC response model.
-	return &pb.RegisterUserResponse{
-		Id:        createdUser.ID,
-		Name:      createdUser.Name,
-		Email:     createdUser.Email,
-		CreatedAt: timestamppb.New(createdUser.CreatedAt),
-	}, nil
+	return &pb.AuthResponse{AccessToken: authRes.AccessToken}, nil
 }
 
 // LoginUser handles the gRPC request for authenticating a user.
 func (h *GRPCHandler) LoginUser(ctx context.Context, req *pb.LoginUserRequest) (*pb.LoginUserResponse, error) {
-	token, err := h.service.Login(ctx, req.Email, req.Password)
+	authRes, err := h.service.Login(ctx, models.LoginRequest{Email: req.Email, Password: req.Password})
 	if err != nil {
-		return nil, err
+		if errors.Is(err, models.ErrInvalidCredentials) {
+			return nil, status.Error(codes.Unauthenticated, "invalid email or password")
+		}
+		return nil, status.Error(codes.Internal, "failed to log in")
 	}
+	return &pb.AuthResponse{AccessToken: authRes.AccessToken}, nil
+}
 
-	return &pb.LoginUserResponse{
-		AccessToken: token,
-	}, nil
+func (h *GRPCHandler) ActivateAccount(ctx context.Context, req *pb.ActivateAccountRequest) (*pb.AuthResponse, error) {
+	authRes, err := h.service.ActivateUserAndLogin(ctx, req.Token)
+	if err != nil {
+		if errors.Is(err, models.ErrInvalidToken) {
+			return nil, status.Error(codes.InvalidArgument, "invalid or expired activation token")
+		}
+		return nil, status.Error(codes.Internal, "failed to activate account")
+	}
+	return &pb.AuthResponse{AccessToken: authRes.AccessToken}, nil
 }
 
 // GetUserProfile handles the gRPC request for fetching a user's profile.
 func (h *GRPCHandler) GetUserProfile(ctx context.Context, req *pb.GetUserProfileRequest) (*pb.GetUserProfileResponse, error) {
-	user, err := h.service.GetUserByID(ctx, req.UserId)
+	userID, err := utils.GetUserIDFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	user, err := h.service.GetUserProfile(ctx, userID)
+	if err != nil {
+		if errors.Is(err, models.ErrNotFound) {
+			return nil, status.Error(codes.NotFound, "user profile not found")
+		}
+		return nil, status.Error(codes.Internal, "failed to retrieve profile")
+	}
+
 	return &pb.GetUserProfileResponse{
 		Id:        user.ID,
-		Name:      user.Name,
+		Name:      user.Nickname,
 		Email:     user.Email,
 		CreatedAt: timestamppb.New(user.CreatedAt),
 		UpdatedAt: timestamppb.New(user.UpdatedAt),

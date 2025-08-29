@@ -13,15 +13,40 @@ import "google/protobuf/timestamp.proto";
 // The UserService defines all the RPCs (Remote Procedure Calls) for managing
 // users.
 service UserService {
-  // Registers a new user
-  rpc RegisterUser(RegisterUserRequest) returns (RegisterUserResponse);
-  // Authenticates a user and returns a JWT
-  rpc LoginUser(LoginUserRequest) returns (LoginUserResponse);
-  // Retrieves a user's profile information
-  rpc GetUserProfile(GetUserProfileRequest) returns (GetUserProfileResponse);
+  // Auth
+  rpc RegisterUser(RegisterUserRequest) returns (AuthResponse);
+  rpc LoginUser(LoginUserRequest) returns (AuthResponse);
+  rpc ActivateAccount(ActivateAccountRequest) returns (AuthResponse);
+  rpc ResendActivationEmail(ResendActivationEmailRequest)
+      returns (GenericResponse);
+  rpc RequestPasswordReset(RequestPasswordResetRequest)
+      returns (GenericResponse);
+  rpc ResetPassword(ResetPasswordRequest) returns (AuthResponse);
+
+  // Profile
+  rpc GetUserProfile(GetUserProfileRequest) returns (UserProfileResponse);
+  rpc UpdateUserProfile(UpdateUserProfileRequest) returns (UserProfileResponse);
+
+  // Addresses
+  rpc AddAddress(AddAddressRequest) returns (AddressResponse);
+  rpc ListAddresses(ListAddressesRequest) returns (ListAddressesResponse);
+  rpc UpdateAddress(UpdateAddressRequest) returns (AddressResponse);
+  rpc DeleteAddress(DeleteAddressRequest) returns (GenericResponse);
 }
 
-// --- RegisterUser RPC Messages ---
+// --- Common Messages ---
+message AuthResponse { string access_token = 1; }
+
+message GenericResponse { string message = 1; }
+
+message Address {
+  string id = 1;
+  string label = 2;
+  string street_address = 3;
+  bool is_default = 4;
+}
+
+// --- RPC-specific Messages ---
 
 message RegisterUserRequest {
   string name = 1;
@@ -36,8 +61,6 @@ message RegisterUserResponse {
   google.protobuf.Timestamp created_at = 4;
 }
 
-// --- LoginUser RPC Messages ---
-
 message LoginUserRequest {
   string email = 1;
   string password = 2;
@@ -47,16 +70,59 @@ message LoginUserResponse {
   string access_token = 1; // The JWT
 }
 
-// --- GetUserProfile RPC Messages ---
+message ActivateAccountRequest { string token = 1; }
 
-message GetUserProfileRequest {
-  string user_id = 1; // The ID of the user to fetch
+message ResendActivationEmailRequest { string email = 1; }
+
+message RequestPasswordResetRequest { string email = 1; }
+
+message ResetPasswordRequest {
+  string token = 1;
+  string new_password = 2;
 }
 
-message GetUserProfileResponse {
+message GetUserProfileRequest { string user_id = 1; }
+
+message UserProfileResponse {
   string id = 1;
   string name = 2;
   string email = 3;
   google.protobuf.Timestamp created_at = 4;
   google.protobuf.Timestamp updated_at = 5;
+}
+
+message UpdateUserProfileRequest {
+  string user_id = 1;
+  string name = 2;
+}
+
+message AddAddressRequest {
+  string user_id = 1;
+  string label = 2;
+  string street_address = 3;
+  bool is_default = 4;
+}
+
+message AddressResponse { Address address = 1; }
+
+message ListAddressesRequest {
+  string user_id = 1;
+  int32 page = 2;  // The requested page number
+  int32 limit = 3; // The number of items per page
+}
+
+message ListAddressesResponse { repeated Address addresses = 1; }
+
+message UpdateAddressRequest {
+  string user_id = 1;
+  string address_id = 2;
+  string label = 3;
+  string street_address = 4;
+  bool is_default = 5; // Note: gRPC doesn't have optional primitives. The
+                       // client must always send a value.
+}
+
+message DeleteAddressRequest {
+  string user_id = 1;
+  string address_id = 2;
 }
