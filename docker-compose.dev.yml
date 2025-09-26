@@ -1,0 +1,171 @@
+# This Docker Compose file is optimized for local development.
+# It uses volume mounts for live code reloading and exposes ports for each service.
+
+services:
+  #----------------------------------------------------#
+  #                 APPLICATION SERVICES               #
+  #----------------------------------------------------#
+
+  user-service:
+    container_name: circuit_user_service_dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder # Use the 'builder' stage which has the Go toolchain
+    ports:
+      - "50051:50051" # Expose gRPC port to host
+    volumes:
+      - .:/app # Mount source code for live-reloading
+    env_file:
+      - .env # Load environment variables from .env file
+    environment:
+      - DB_HOST=db # Override DB_HOST to use the service name inside the Docker network
+      - GRPC_PORT=50051
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    command: air -c .air.toml # Use 'air' for hot-reloading
+
+  order-service:
+    container_name: circuit_order_service_dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    ports:
+      - "50052:50052"
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=db
+      - GRPC_PORT=50052
+    depends_on:
+      db:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    restart: unless-stopped
+    command: air -c .air.toml
+
+  item-service:
+    container_name: circuit_item_service_dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    ports:
+      - "50053:50053"
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=db
+      - GRPC_PORT=50053
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    command: air -c .air.toml
+
+  fleet-management-service:
+    container_name: circuit_fleet_service_dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    ports:
+      - "50054:50054"
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=db
+      - GRPC_PORT=50054
+    depends_on:
+      db:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    restart: unless-stopped
+    command: air -c .air.toml
+
+  tracking-service:
+    container_name: circuit_tracking_service_dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    ports:
+      - "50055:50055" # gRPC port
+      - "8081:8081" # WebSocket port
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - GRPC_PORT=50055
+      - WEBSOCKET_PORT=8081
+    depends_on:
+      kafka:
+        condition: service_started
+    restart: unless-stopped
+    command: air -c .air.toml
+
+  # NOTE: Add other services (notification, preference, etc.) here following the same pattern.
+
+  #----------------------------------------------------#
+  #                INFRASTRUCTURE SERVICES             #
+  #----------------------------------------------------#
+
+  db:
+    image: postgis/postgis:16-3.5-alpine
+    container_name: circuit_db_dev
+    environment:
+      POSTGRES_USER: ${DB_USER:-backend-dev}
+      POSTGPOSTGRES_PASSWORD: ${DB_PASSWORD:-dispatch-and-delivery}
+      POSTGRES_DB: ${DB_NAME:-circuit_db}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-backend-dev} -d ${DB_NAME:-circuit_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.0.1
+    container_name: zookeeper_dev
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.0.1
+    container_name: kafka_dev
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+#----------------------------------------------------#
+#                      VOLUMES                       #
+#----------------------------------------------------#
+
+volumes:
+  postgres_db_data:
