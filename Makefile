@@ -46,12 +46,7 @@ logs:
 
 proto-gen:
 	@echo "Generating Go code from .proto files..."
-	@protoc \
-			-I . \
-	        -I third_party/proto \
-			--go_out=. --go_opt=paths=source_relative \
-            --go-grpc_out=. --go-grpc_opt=paths=source_relative \
-            pkg/proto/**/*.proto
+	buf generate
 
 migrate-up:
 	@echo "Applying database migrations..."

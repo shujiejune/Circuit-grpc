@@ -1,3 +1,5 @@
+## Future Improvements
+
 Core Backend and Distributed Systems (SDE)
 - Optimized a monolithic backend into a high-concurrency microservices architecture via gRPC, resulting in a 40% reduction in inter-service latency
 - Engineered a real-time dispatch engine using Apache Pulsar for load-balanced task queues and Redis for proximity indexing, enabling sub-50ms vehicle allocation for thousands of concurrent orders
@@ -6,6 +8,8 @@ Data Engineering and AI Integration (AI/ML)
 - Built a real-time ELT pipeline using Apache Pulsar and TimescaleDB, ingesting high-frequency drone telemetry (100+ events/sec) to facilitate long-term historical analysis and model training
 - Developed an AI-driven routing service by integrating a Python inference microservice with the Go backend, utilizing Graph Neural Networks (GNN) to optimize delivery paths based on historical traffic topology
 - Implemented a Retrieval-Augmented Generation (RAG) system for unstructured command parsing, deploying a local LLM alongside the microservices cluster to securely process natural language dispatch instructions
+
+### AI/ML Improvements
 
 Option A: The "Real" Engineering Path (Route Optimization)
 - The Tech: Reinforcement Learning (RL) or Graph Neural Networks (GNN).
@@ -44,3 +48,35 @@ Option B: The "LLM" Path (But Engineered Correctly)
 ├── proto
 │   └── ai_engine
 │       └── inference.proto <-- Defines input (State) and output (Action)
+
+## Workflow Diagram
+
+[ Drones / Robots ]
+              │
+              ▼ (gRPC / MQTT)
+      [ Gateway Service ]
+              │
+              ├─── (Hot Data: "Where am I now?") ──▶ [ REDIS ] (Geo Index)
+              │                                          ▲
+              │                                          │ (Query for Dispatch)
+              ▼ (Async: "Log my path")                   │
+      [ PULSAR CLUSTER ] ────────────────────────┐       │
+              │                                  │       │
+              ▼                                  ▼       ▼
+    [ Tracking Service ]                 [ Dispatch Service ]
+    (Writes to TimescaleDB)              (The AI / RL Model)
+                                                 │
+                                                 ▼
+                                        [ Order Service ]
+                                        (Writes to Postgres)
+
+## Microservices Brief Summaries
+
+- users: auth and profiles
+- orders: state machine for orders (pending -> assigned -> delivered)
+- items: inventory management
+- fleet: drone / robot fleet management
+- dispatch: decision maker
+- tracking: high-speed data ingestor
+- notification: decouple 3rd party API failures
+- recommendation (ai-engine): inference engine for route options
