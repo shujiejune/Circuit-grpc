@@ -14,8 +14,8 @@ option go_package = "laas/api/proto/user";
 // users.
 service UserService {
   // Auth
-  rpc RegisterUser(RegisterUserRequest) returns (AuthResponse);
-  rpc LoginUser(LoginUserRequest) returns (AuthResponse);
+  rpc Signup(SignupRequest) returns (AuthResponse);
+  rpc LoginUser(LoginRequest) returns (AuthResponse);
   rpc ActivateAccount(ActivateAccountRequest) returns (AuthResponse);
   rpc ResendActivationEmail(ResendActivationEmailRequest) returns (GenericResponse);
   rpc RequestPasswordReset(RequestPasswordResetRequest) returns (GenericResponse);
@@ -32,13 +32,34 @@ service UserService {
   rpc DeleteAddress(DeleteAddressRequest) returns (GenericResponse);
 }
 
+// --- User Model ---
+message User {
+  string id = 1;
+  string nickname = 2;
+  string email = 3;
+  string avatar_url = 4;
+  string auth_provider = 5;
+  bool is_active = 6;
+  Role role = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+enum Role {
+  ROLE_USER = 0;
+  ROLE_ADMIN = 1;
+}
+
 // --- Common Messages ---
 message AuthResponse {
   string access_token = 1;
+  string refresh_token = 2;
+  User user = 3;
 }
 
 message GenericResponse {
-  string message = 1;
+  bool success = 1;
+  string message = 2;
 }
 
 message Address {
@@ -50,26 +71,28 @@ message Address {
 
 // --- RPC-specific Messages ---
 
-message RegisterUserRequest {
+message SignupRequest {
   string name = 1;
   string email = 2;
   string password = 3;
 }
 
-message RegisterUserResponse {
+message SignupResponse {
   string id = 1;
   string name = 2;
   string email = 3;
   google.protobuf.Timestamp created_at = 4;
 }
 
-message LoginUserRequest {
+message LoginRequest {
   string email = 1;
   string password = 2;
 }
 
-message LoginUserResponse {
+message LoginResponse {
   string access_token = 1; // The JWT
+  string refresh_token = 2;
+  User user = 3;
 }
 
 message ActivateAccountRequest {
